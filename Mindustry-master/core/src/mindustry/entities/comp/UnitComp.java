@@ -644,11 +644,15 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
     public void update(){
 
         // If this unit is being carried as a payload by another unit, skip movement/physics/AI updates
-        // Weapons and abilities are still updated by their own components (WeaponsComp, etc.)
+        // Weapons are still updated by WeaponsComp.update()
         if(inPayload){
-            // Update AI controller so it can aim and shoot (targeting only, not movement)
-            if(!net.client() && !dead && shouldUpdateController()){
-                controller.updateUnit();
+            // Update AI targeting so the unit can aim and shoot while being carried
+            if(!net.client() && !dead && controller instanceof AIController ai){
+                ai.updateTargeting();
+            }
+            // Update abilities
+            for(Ability a : abilities){
+                a.update(self());
             }
             return;
         }

@@ -98,7 +98,7 @@ public class UnitPayload implements Payload{
     public void set(float x, float y, float rotation){
         unit.set(x, y);
         // When unitPayloadUnitUpdate is enabled, don't override the unit's rotation
-        // so it can freely aim at targets
+        // so the AI can freely aim at targets
         if(!Vars.state.rules.unitPayloadUnitUpdate || !unit.inPayload){
             unit.rotation = rotation;
         }
