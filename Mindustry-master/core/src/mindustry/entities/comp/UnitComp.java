@@ -61,6 +61,8 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
     transient int lastFogPos;
     /** Only used in suicide units */
     transient boolean hasTarget;
+    /** True when this unit is being carried as a payload by another unit and unitPayloadUnitUpdate rule is enabled. */
+    transient boolean inPayload;
     private transient float resupplyTime = Mathf.random(10f);
     private transient boolean wasPlayer;
     private transient boolean wasHealed;
@@ -640,6 +642,16 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
 
     @Override
     public void update(){
+
+        // If this unit is being carried as a payload by another unit, skip movement/physics/AI updates
+        // Weapons and abilities are still updated by their own components (WeaponsComp, etc.)
+        if(inPayload){
+            // Update AI controller so it can aim and shoot (targeting only, not movement)
+            if(!net.client() && !dead && shouldUpdateController()){
+                controller.updateUnit();
+            }
+            return;
+        }
 
         type.update(self());
 

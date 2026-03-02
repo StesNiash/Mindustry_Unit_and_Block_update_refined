@@ -4,6 +4,7 @@ import arc.*;
 import arc.graphics.*;
 import arc.graphics.g2d.*;
 import arc.math.*;
+import arc.math.geom.*;
 import arc.scene.style.*;
 import arc.util.*;
 import arc.util.io.*;
@@ -50,6 +51,12 @@ public class UnitPayload implements Payload{
     @Override
     public void update(@Nullable Unit unitHolder, @Nullable Building buildingHolder){
         unit.type.updatePayload(unit, unitHolder, buildingHolder);
+
+        // When the unit is kept in the group (unitPayloadUnitUpdate rule), force its position to match the carrier
+        if(unitHolder != null && Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
+            unit.set(unitHolder.x, unitHolder.y);
+            unit.vel.setZero();
+        }
     }
 
     @Override
@@ -75,9 +82,26 @@ public class UnitPayload implements Payload{
     }
 
     @Override
+    public void remove(){
+        // When the carrier is removed and unitPayloadUnitUpdate is enabled, restore the carried unit's state
+        if(Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
+            if(unit.physref != null){
+                unit.physref.body.mass = unit.mass();
+            }
+            unit.elevation = 0f;
+            unit.inPayload = false;
+            // Unit is already in the group, nothing else needed
+        }
+    }
+
+    @Override
     public void set(float x, float y, float rotation){
         unit.set(x, y);
-        unit.rotation = rotation;
+        // When unitPayloadUnitUpdate is enabled, don't override the unit's rotation
+        // so it can freely aim at targets
+        if(!Vars.state.rules.unitPayloadUnitUpdate || !unit.inPayload){
+            unit.rotation = rotation;
+        }
     }
 
     @Override

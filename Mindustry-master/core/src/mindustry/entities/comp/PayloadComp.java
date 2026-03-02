@@ -78,7 +78,7 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
     }
 
     boolean canPickup(Unit unit){
-        return type.pickupUnits && payloadUsed() + unit.hitSize * unit.hitSize <= type.payloadCapacity + 0.001f && unit.team == team() && unit.isAI() && unit.type.allowedInPayloads;
+        return type.pickupUnits && payloadUsed() + unit.hitSize * unit.hitSize <= type.payloadCapacity + 0.001f && unit.team == team() && unit.isAI() && unit.type.allowedInPayloads && !unit.inPayload;
     }
 
     boolean canPickup(Building build){
@@ -104,6 +104,7 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
                 unit.physref.body.mass = 0f;
             }
             unit.elevation = 0.5f;
+            unit.inPayload = true;
             // Still add to payload list for tracking
             addPayload(new UnitPayload(unit));
             Fx.unitPickup.at(unit);
@@ -194,8 +195,8 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
                 u.physref.body.mass = u.mass();
             }
             u.elevation = 0f;
-            // Unit is already in the group, just reset ID for sync
-            u.id = EntityGroup.nextId();
+            u.inPayload = false;
+            // Unit is already in the group, no need to re-add or change ID
         } else {
             //reset the ID to a new value to make sure it's synced
             u.id = EntityGroup.nextId();
