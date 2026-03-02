@@ -98,16 +98,29 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
     }
 
     void pickup(Unit unit){
-        if(unit.isAdded()) unit.team.data().updateCount(unit.type, 1);
+        if(Vars.state.rules.unitPayloadUnitUpdate){
+            // Keep unit in the group but make it "ghost" - zero mass, elevated, so it updates but doesn't interfere
+            if(unit.physref != null){
+                unit.physref.body.mass = 0f;
+            }
+            unit.elevation = 0.5f;
+            // Still add to payload list for tracking
+            addPayload(new UnitPayload(unit));
+            Fx.unitPickup.at(unit);
+            Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
+            Events.fire(new PickupEvent(self(), unit));
+        } else {
+            if(unit.isAdded()) unit.team.data().updateCount(unit.type, 1);
 
-        unit.remove();
-        addPayload(new UnitPayload(unit));
-        Fx.unitPickup.at(unit);
-        if(Vars.net.client()){
-            Vars.netClient.clearRemovedEntity(unit.id);
+            unit.remove();
+            addPayload(new UnitPayload(unit));
+            Fx.unitPickup.at(unit);
+            if(Vars.net.client()){
+                Vars.netClient.clearRemovedEntity(unit.id);
+            }
+            Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
+            Events.fire(new PickupEvent(self(), unit));
         }
-        Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
-        Events.fire(new PickupEvent(self(), unit));
     }
 
     void pickup(Building tile){
@@ -174,11 +187,22 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
 
         u.set(x + Tmp.v1.x, y + Tmp.v1.y);
         u.rotation(rotation);
-        //reset the ID to a new value to make sure it's synced
-        u.id = EntityGroup.nextId();
-        //decrement count to prevent double increment
-        if(!u.isAdded()) u.team.data().updateCount(u.type, -1);
-        u.add();
+
+        if(Vars.state.rules.unitPayloadUnitUpdate){
+            // Restore physics mass and landing elevation
+            if(u.physref != null){
+                u.physref.body.mass = u.mass();
+            }
+            u.elevation = 0f;
+            // Unit is already in the group, just reset ID for sync
+            u.id = EntityGroup.nextId();
+        } else {
+            //reset the ID to a new value to make sure it's synced
+            u.id = EntityGroup.nextId();
+            //decrement count to prevent double increment
+            if(!u.isAdded()) u.team.data().updateCount(u.type, -1);
+            u.add();
+        }
         u.unloaded();
         Sound dropSound =
             payload.size() <= 12f ? Sounds.payloadDrop1 :
