@@ -56,6 +56,10 @@ public class UnitPayload implements Payload{
         if(unitHolder != null && Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
             unit.set(unitHolder.x, unitHolder.y);
             unit.vel.setZero();
+            // Ensure physics mass stays at 0 (physref may be initialized after add())
+            if(unit.physref != null && unit.physref.body.mass != 0f){
+                unit.physref.body.mass = 0f;
+            }
         }
     }
 
@@ -147,7 +151,9 @@ public class UnitPayload implements Payload{
         }
 
         //cannot dump when there's a lot of overlap going on
-        if(!unit.type.flying && Units.count(unit.x, unit.y, unit.physicSize() * 1.05f, o -> o.isGrounded() && (o.type.allowLegStep == unit.type.allowLegStep)) > 0){
+        // When unitPayloadUnitUpdate is enabled, exclude the unit itself from the count (it's already in the group)
+        int maxOverlap = (Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload) ? 1 : 0;
+        if(!unit.type.flying && Units.count(unit.x, unit.y, unit.physicSize() * 1.05f, o -> o.isGrounded() && (o.type.allowLegStep == unit.type.allowLegStep)) > maxOverlap){
             return false;
         }
 
@@ -156,7 +162,17 @@ public class UnitPayload implements Payload{
 
         //prevents stacking
         unit.vel.add(Mathf.range(0.5f), Mathf.range(0.5f));
-        unit.add();
+
+        if(Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
+            // Unit is already in the group, just restore its state
+            if(unit.physref != null){
+                unit.physref.body.mass = unit.mass();
+            }
+            unit.elevation = 0f;
+            unit.inPayload = false;
+        } else {
+            unit.add();
+        }
         unit.unloaded();
         Events.fire(new UnitUnloadEvent(unit));
         Units.notifyUnitSpawn(unit);

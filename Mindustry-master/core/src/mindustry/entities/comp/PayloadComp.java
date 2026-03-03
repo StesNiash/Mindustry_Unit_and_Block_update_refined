@@ -94,18 +94,24 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
     }
 
     void addPayload(Payload load){
-        payloads.add(load);
-    }
-
-    void pickup(Unit unit){
-        if(Vars.state.rules.unitPayloadUnitUpdate){
-            // Keep unit in the group but make it "ghost" - zero mass, elevated, so it updates but doesn't interfere
+        // When unitPayloadUnitUpdate is enabled and we're adding a UnitPayload, apply the same ghost logic
+        if(Vars.state.rules.unitPayloadUnitUpdate && load instanceof UnitPayload up){
+            Unit unit = up.unit;
+            if(!unit.isAdded()){
+                unit.add();
+            }
             if(unit.physref != null){
                 unit.physref.body.mass = 0f;
             }
             unit.elevation = 0.5f;
             unit.inPayload = true;
-            // Still add to payload list for tracking
+        }
+        payloads.add(load);
+    }
+
+    void pickup(Unit unit){
+        if(Vars.state.rules.unitPayloadUnitUpdate){
+            // addPayload will handle adding to group and setting inPayload
             addPayload(new UnitPayload(unit));
             Fx.unitPickup.at(unit);
             Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
@@ -177,7 +183,9 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
 
         //can't drop ground units
         //allow stacking for small units for now - otherwise, unit transfer would get annoying
-        if(!u.canPass(World.toTile(x + Tmp.v1.x), World.toTile(y + Tmp.v1.y)) || Units.count(x, y, u.physicSize(), o -> o.isGrounded() && o.hitSize > 14f) > 1){
+        // When unitPayloadUnitUpdate is enabled, the unit is already in the group, so allow 1 extra overlap (itself)
+        int maxOverlap = (Vars.state.rules.unitPayloadUnitUpdate && u.inPayload) ? 2 : 1;
+        if(!u.canPass(World.toTile(x + Tmp.v1.x), World.toTile(y + Tmp.v1.y)) || Units.count(x, y, u.physicSize(), o -> o.isGrounded() && o.hitSize > 14f) > maxOverlap){
             return false;
         }
 
