@@ -1,0 +1,197 @@
+// Patch: payload-unit-dual-weapon-fix
+// Fixes shooting display for units carried as payload by unmodified clients using dual weapons.
+//
+// Problem: When a unit is carried as payload, its rotation is locked to the carrier's rotation.
+// Setting rotate=true makes weapons look unnatural as they spin independently.
+//
+// Solution: Duplicate each weapon:
+// 1. Decorative weapon - visible, doesn't rotate, doesn't shoot (noAttack=true)
+// 2. Functional weapon - invisible (empty region), rotates (rotate=true), shoots
+//
+// This way the unit looks normal but can shoot in any direction on unmodified clients.
+
+name: Payload Unit Dual Weapon Fix
+
+unit: {
+  // Example: dagger
+  // Original: 1 weapon "large-weapon" (mirror=true) → indices 0, 1
+  // After patch: 
+  //   - weapons 0, 1: decorative (original, noAttack=true)
+  //   - weapons 2, 3: functional (invisible, rotate=true)
+
+  dagger: {
+    // Make original weapons decorative (don't shoot)
+    weapons.0.noAttack: true
+    weapons.1.noAttack: true
+
+    // Add functional invisible weapons
+    weapons.+: [
+      {
+        // Functional weapon (left side)
+        reload: 13
+        x: 4
+        y: 2
+        top: false
+        rotate: true
+        rotateSpeed: 20
+        name: ""  // Empty region = invisible
+        ejectEffect: none
+        bullet: {
+          type: BasicBulletType
+          speed: 2.5
+          damage: 9
+          width: 7
+          height: 9
+          lifetime: 60
+        }
+      }
+      {
+        // Functional weapon (right side, mirrored)
+        reload: 13
+        x: -4
+        y: 2
+        top: false
+        rotate: true
+        rotateSpeed: 20
+        name: ""  // Empty region = invisible
+        ejectEffect: none
+        bullet: {
+          type: BasicBulletType
+          speed: 2.5
+          damage: 9
+          width: 7
+          height: 9
+          lifetime: 60
+        }
+      }
+    ]
+  }
+
+  // Example: fortress
+  fortress: {
+    // Make original weapons decorative
+    weapons.0.noAttack: true
+    weapons.1.noAttack: true
+
+    // Add functional invisible weapons
+    weapons.+: [
+      {
+        // Functional weapon (left side)
+        y: 1
+        x: 9
+        reload: 60
+        recoil: 4
+        shake: 2
+        rotate: true
+        rotateSpeed: 20
+        name: ""
+        ejectEffect: none
+        shootSound: artillery
+        bullet: {
+          type: ArtilleryBulletType
+          speed: 2
+          damage: 20
+          sprite: shell
+          hitEffect: blastExplosion
+          knockback: 0.8
+          lifetime: 102.5
+          maxRange: 240
+          width: 14
+          height: 14
+          collides: true
+          collidesTiles: true
+          splashDamageRadius: 35
+          splashDamage: 80
+          backColor: f9c27a
+          frontColor: ffd37f
+        }
+      }
+      {
+        // Functional weapon (right side)
+        y: 1
+        x: -9
+        reload: 60
+        recoil: 4
+        shake: 2
+        rotate: true
+        rotateSpeed: 20
+        name: ""
+        ejectEffect: none
+        shootSound: artillery
+        bullet: {
+          type: ArtilleryBulletType
+          speed: 2
+          damage: 20
+          sprite: shell
+          hitEffect: blastExplosion
+          knockback: 0.8
+          lifetime: 102.5
+          maxRange: 240
+          width: 14
+          height: 14
+          collides: true
+          collidesTiles: true
+          splashDamageRadius: 35
+          splashDamage: 80
+          backColor: f9c27a
+          frontColor: ffd37f
+        }
+      }
+    ]
+  }
+
+  // Example: atrax
+  atrax: {
+    // Make original weapons decorative
+    weapons.0.noAttack: true
+    weapons.1.noAttack: true
+
+    // Add functional invisible weapons
+    weapons.+: [
+      {
+        // Functional weapon (left side)
+        shootY: 3
+        reload: 9
+        recoil: 1
+        x: 7
+        rotate: true
+        rotateSpeed: 20
+        name: ""
+        ejectEffect: none
+        shootSound: shootAtrax
+        bullet: {
+          type: LiquidBulletType
+          liquid: slag
+          damage: 13
+          speed: 2.5
+          drag: 0.009
+          shootEffect: shootSmall
+          lifetime: 57
+          collidesAir: false
+        }
+      }
+      {
+        // Functional weapon (right side)
+        shootY: 3
+        reload: 9
+        recoil: 1
+        x: -7
+        rotate: true
+        rotateSpeed: 20
+        name: ""
+        ejectEffect: none
+        shootSound: shootAtrax
+        bullet: {
+          type: LiquidBulletType
+          liquid: slag
+          damage: 13
+          speed: 2.5
+          drag: 0.009
+          shootEffect: shootSmall
+          lifetime: 57
+          collidesAir: false
+        }
+      }
+    ]
+  }
+}
