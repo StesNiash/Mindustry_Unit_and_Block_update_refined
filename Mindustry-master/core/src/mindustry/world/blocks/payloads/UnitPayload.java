@@ -55,7 +55,8 @@ public class UnitPayload implements Payload{
         // When the unit is kept in the group (unitPayloadUnitUpdate rule), force its position to match the carrier
         if(unitHolder != null && Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
             unit.set(unitHolder.x, unitHolder.y);
-            unit.vel.setZero();
+            // Inherit carrier's velocity so bullets are fired with correct velocity
+            unit.vel.set(unitHolder.vel);
             // Ensure physics mass stays at 0 (physref may be initialized after add())
             if(unit.physref != null && unit.physref.body.mass != 0f){
                 unit.physref.body.mass = 0f;
