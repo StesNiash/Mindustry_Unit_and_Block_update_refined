@@ -652,6 +652,13 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
             // Update AI targeting so the unit can aim and shoot while being carried
             if(!net.client() && !dead && controller instanceof AIController ai){
                 ai.updateTargeting();
+                // Clear invalid attack targets so the unit doesn't get stuck after a target is destroyed
+                if(controller instanceof mindustry.ai.types.CommandAI cmd){
+                    if(cmd.attackTarget != null && ai.invalid(cmd.attackTarget)){
+                        cmd.attackTarget = null;
+                        cmd.targetPos = null;
+                    }
+                }
             }
             // Update abilities
             for(Ability a : abilities){
