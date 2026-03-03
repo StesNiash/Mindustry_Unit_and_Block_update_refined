@@ -470,8 +470,11 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
         controller(controller);
     }
 
-    /** @return the collision layer to use for unit physics. Returning anything outside of PhysicsProcess contents will crash the game. */
+    /** @return the collision layer to use for unit physics. Returning anything outside of PhysicsProcess contents will crash the game.
+     *  Returns -1 when the unit is being carried as a payload, to exclude it from physics collision entirely.
+     *  This prevents NaN positions caused by two zero-mass bodies at the same location dividing by zero. */
     public int collisionLayer(){
+        if(inPayload) return -1;
         return type.allowLegStep && type.legPhysicsLayer ? PhysicsProcess.layerLegs : isGrounded() ? PhysicsProcess.layerGround : PhysicsProcess.layerFlying;
     }
 
