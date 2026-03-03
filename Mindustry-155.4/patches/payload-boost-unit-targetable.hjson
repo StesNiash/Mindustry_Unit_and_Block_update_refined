@@ -1,0 +1,28 @@
+// Patch: payload-boost-unit-targetable
+// Makes boost-capable units (nova, pulsar, quasar, vela) untargetable and unhittable while they are carried as payload.
+// Uses vulnerableWithPayloads = true so they become targetable when they themselves carry a block.
+// This prevents ground turrets from attacking them while they are being carried, and allows them to shoot on the client (since they are grounded).
+name: Payload Boost Unit Targetable Fix
+
+unit: {
+  nova: {
+    targetable: false
+    hittable: false
+    vulnerableWithPayloads: true
+  }
+  pulsar: {
+    targetable: false
+    hittable: false
+    vulnerableWithPayloads: true
+  }
+  quasar: {
+    targetable: false
+    hittable: false
+    vulnerableWithPayloads: true
+  }
+  vela: {
+    targetable: false
+    hittable: false
+    vulnerableWithPayloads: true
+  }
+}

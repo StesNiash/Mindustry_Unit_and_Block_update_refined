@@ -118,7 +118,7 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
             if(unit.physref != null){
                 unit.physref.body.mass = 0f;
             }
-            unit.elevation = 0.5f;
+            unit.elevation = unit.type.canBoost ? 0.05f : 0.5f;
             unit.inPayload = true;
         }
         payloads.add(load);
