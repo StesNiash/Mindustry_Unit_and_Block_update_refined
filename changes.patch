@@ -1,0 +1,354 @@
+diff --git a/Mindustry-master/core/assets/bundles/bundle.properties b/Mindustry-master/core/assets/bundles/bundle.properties
+index 6e67cc0..e4e9cbd 100644
+--- a/Mindustry-master/core/assets/bundles/bundle.properties
++++ b/Mindustry-master/core/assets/bundles/bundle.properties
+@@ -1501,6 +1501,8 @@ rules.logicunitdeconstruct = Logic Unit Deconstruction
+ rules.solarmultiplier = Solar Power Multiplier
+ rules.unitcapvariable = Cores Contribute To Unit Cap
+ rules.unitpayloadsexplode = Carried Payloads Explode With The Unit
++rules.unitpayloadupdate = [EXPERIMENTAL] Blocks Update While Transported
++rules.unitpayloadunitupdate = [EXPERIMENTAL] Carried Units Update While Transported
+ rules.unitcap = Base Unit Cap
+ rules.limitarea = Limit Map Area
+ rules.enemycorebuildradius = Core No-Build Radius:[lightgray] (tiles)
+diff --git a/Mindustry-master/core/assets/bundles/bundle_ru.properties b/Mindustry-master/core/assets/bundles/bundle_ru.properties
+index d36fc1f..2c3b648 100644
+--- a/Mindustry-master/core/assets/bundles/bundle_ru.properties
++++ b/Mindustry-master/core/assets/bundles/bundle_ru.properties
+@@ -1501,6 +1501,8 @@ rules.logicunitdeconstruct = Logic Unit Deconstruction
+ rules.solarmultiplier = Множитель солнечной энергии
+ rules.unitcapvariable = Ядра увеличивают лимит единиц
+ rules.unitpayloadsexplode = Перевозимые грузы взрываются с перевозящей единицей
++rules.unitpayloadupdate = [ЭКСПЕРИМ.] Блоки продолжают работать при переноске
++rules.unitpayloadunitupdate = [ЭКСПЕРИМ.] Перевозимые юниты продолжают работать при переноске
+ rules.unitcap = Начальный лимит единиц
+ rules.limitarea = Ограничить область карты
+ rules.enemycorebuildradius = Радиус защиты враж. ядер:[lightgray] (блок.)
+diff --git a/Mindustry-master/core/src/mindustry/entities/comp/PayloadComp.java b/Mindustry-master/core/src/mindustry/entities/comp/PayloadComp.java
+index f84ab98..7092985 100644
+--- a/Mindustry-master/core/src/mindustry/entities/comp/PayloadComp.java
++++ b/Mindustry-master/core/src/mindustry/entities/comp/PayloadComp.java
+@@ -25,6 +25,7 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
+     @Import float x, y, rotation;
+     @Import Team team;
+     @Import UnitType type;
++    @Import ItemStack stack;
+ 
+     Seq<Payload> payloads = new Seq<>();
+ 
+@@ -59,6 +60,21 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
+             pay.set(x, y, rotation);
+             pay.update(self(), null);
+         }
++
++        // When unitPayloadUpdate is enabled, supply carried blocks with items from the carrier's inventory
++        if(Vars.state.rules.unitPayloadUpdate && stack.amount > 0 && stack.item != null){
++            Item item = stack.item;
++            for(Payload pay : payloads){
++                if(pay instanceof BuildPayload bp && bp.build.block.hasItems && bp.build.acceptItem(bp.build, item)){
++                    bp.build.handleItem(bp.build, item);
++                    stack.amount--;
++                    if(stack.amount <= 0){
++                        stack.amount = 0;
++                        break;
++                    }
++                }
++            }
++        }
+     }
+ 
+     @Override
+@@ -78,7 +94,7 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
+     }
+ 
+     boolean canPickup(Unit unit){
+-        return type.pickupUnits && payloadUsed() + unit.hitSize * unit.hitSize <= type.payloadCapacity + 0.001f && unit.team == team() && unit.isAI() && unit.type.allowedInPayloads;
++        return type.pickupUnits && payloadUsed() + unit.hitSize * unit.hitSize <= type.payloadCapacity + 0.001f && unit.team == team() && unit.isAI() && unit.type.allowedInPayloads && !unit.inPayload;
+     }
+ 
+     boolean canPickup(Building build){
+@@ -94,20 +110,40 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
+     }
+ 
+     void addPayload(Payload load){
++        // When unitPayloadUnitUpdate is enabled and we're adding a UnitPayload, apply the same ghost logic
++        if(Vars.state.rules.unitPayloadUnitUpdate && load instanceof UnitPayload up){
++            Unit unit = up.unit;
++            if(!unit.isAdded()){
++                unit.add();
++            }
++            if(unit.physref != null){
++                unit.physref.body.mass = 0f;
++            }
++            unit.elevation = 0.5f;
++            unit.inPayload = true;
++        }
+         payloads.add(load);
+     }
+ 
+     void pickup(Unit unit){
+-        if(unit.isAdded()) unit.team.data().updateCount(unit.type, 1);
+-
+-        unit.remove();
+-        addPayload(new UnitPayload(unit));
+-        Fx.unitPickup.at(unit);
+-        if(Vars.net.client()){
+-            Vars.netClient.clearRemovedEntity(unit.id);
++        if(Vars.state.rules.unitPayloadUnitUpdate){
++            // addPayload will handle adding to group and setting inPayload
++            addPayload(new UnitPayload(unit));
++            Fx.unitPickup.at(unit);
++            Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
++            Events.fire(new PickupEvent(self(), unit));
++        } else {
++            if(unit.isAdded()) unit.team.data().updateCount(unit.type, 1);
++
++            unit.remove();
++            addPayload(new UnitPayload(unit));
++            Fx.unitPickup.at(unit);
++            if(Vars.net.client()){
++                Vars.netClient.clearRemovedEntity(unit.id);
++            }
++            Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
++            Events.fire(new PickupEvent(self(), unit));
+         }
+-        Sounds.payloadPickup.at(self(), Mathf.random(0.9f, 1.1f));
+-        Events.fire(new PickupEvent(self(), unit));
+     }
+ 
+     void pickup(Building tile){
+@@ -163,7 +199,9 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
+ 
+         //can't drop ground units
+         //allow stacking for small units for now - otherwise, unit transfer would get annoying
+-        if(!u.canPass(World.toTile(x + Tmp.v1.x), World.toTile(y + Tmp.v1.y)) || Units.count(x, y, u.physicSize(), o -> o.isGrounded() && o.hitSize > 14f) > 1){
++        // When unitPayloadUnitUpdate is enabled, the unit is already in the group, so allow 1 extra overlap (itself)
++        int maxOverlap = (Vars.state.rules.unitPayloadUnitUpdate && u.inPayload) ? 2 : 1;
++        if(!u.canPass(World.toTile(x + Tmp.v1.x), World.toTile(y + Tmp.v1.y)) || Units.count(x, y, u.physicSize(), o -> o.isGrounded() && o.hitSize > 14f) > maxOverlap){
+             return false;
+         }
+ 
+@@ -174,11 +212,22 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
+ 
+         u.set(x + Tmp.v1.x, y + Tmp.v1.y);
+         u.rotation(rotation);
+-        //reset the ID to a new value to make sure it's synced
+-        u.id = EntityGroup.nextId();
+-        //decrement count to prevent double increment
+-        if(!u.isAdded()) u.team.data().updateCount(u.type, -1);
+-        u.add();
++
++        if(Vars.state.rules.unitPayloadUnitUpdate){
++            // Restore physics mass and landing elevation
++            if(u.physref != null){
++                u.physref.body.mass = u.mass();
++            }
++            u.elevation = 0f;
++            u.inPayload = false;
++            // Unit is already in the group, no need to re-add or change ID
++        } else {
++            //reset the ID to a new value to make sure it's synced
++            u.id = EntityGroup.nextId();
++            //decrement count to prevent double increment
++            if(!u.isAdded()) u.team.data().updateCount(u.type, -1);
++            u.add();
++        }
+         u.unloaded();
+         Sound dropSound =
+             payload.size() <= 12f ? Sounds.payloadDrop1 :
+diff --git a/Mindustry-master/core/src/mindustry/entities/comp/UnitComp.java b/Mindustry-master/core/src/mindustry/entities/comp/UnitComp.java
+index e47e538..4aa4ff9 100644
+--- a/Mindustry-master/core/src/mindustry/entities/comp/UnitComp.java
++++ b/Mindustry-master/core/src/mindustry/entities/comp/UnitComp.java
+@@ -61,6 +61,8 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
+     transient int lastFogPos;
+     /** Only used in suicide units */
+     transient boolean hasTarget;
++    /** True when this unit is being carried as a payload by another unit and unitPayloadUnitUpdate rule is enabled. */
++    transient boolean inPayload;
+     private transient float resupplyTime = Mathf.random(10f);
+     private transient boolean wasPlayer;
+     private transient boolean wasHealed;
+@@ -414,8 +416,8 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
+     @Override
+     @Replace
+     public boolean canShoot(){
+-        //cannot shoot while boosting
+-        return !disarmed && !(type.canBoost && isFlying());
++        //cannot shoot while boosting, but allow shooting when carried as payload
++        return !disarmed && !(type.canBoost && isFlying() && !inPayload);
+     }
+ 
+     public boolean isEnemy(){
+@@ -468,8 +470,11 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
+         controller(controller);
+     }
+ 
+-    /** @return the collision layer to use for unit physics. Returning anything outside of PhysicsProcess contents will crash the game. */
++    /** @return the collision layer to use for unit physics. Returning anything outside of PhysicsProcess contents will crash the game.
++     *  Returns -1 when the unit is being carried as a payload, to exclude it from physics collision entirely.
++     *  This prevents NaN positions caused by two zero-mass bodies at the same location dividing by zero. */
+     public int collisionLayer(){
++        if(inPayload) return -1;
+         return type.allowLegStep && type.legPhysicsLayer ? PhysicsProcess.layerLegs : isGrounded() ? PhysicsProcess.layerGround : PhysicsProcess.layerFlying;
+     }
+ 
+@@ -641,6 +646,27 @@ abstract class UnitComp implements Healthc, Physicsc, Hitboxc, Statusc, Teamc, I
+     @Override
+     public void update(){
+ 
++        // If this unit is being carried as a payload by another unit, skip movement/physics/AI updates
++        // Weapons are still updated by WeaponsComp.update()
++        if(inPayload){
++            // Update AI targeting so the unit can aim and shoot while being carried
++            if(!net.client() && !dead && controller instanceof AIController ai){
++                ai.updateTargeting();
++                // Clear invalid attack targets so the unit doesn't get stuck after a target is destroyed
++                if(controller instanceof mindustry.ai.types.CommandAI cmd){
++                    if(cmd.attackTarget != null && ai.invalid(cmd.attackTarget)){
++                        cmd.attackTarget = null;
++                        cmd.targetPos = null;
++                    }
++                }
++            }
++            // Update abilities
++            for(Ability a : abilities){
++                a.update(self());
++            }
++            return;
++        }
++
+         type.update(self());
+ 
+         //update bounds
+diff --git a/Mindustry-master/core/src/mindustry/game/Rules.java b/Mindustry-master/core/src/mindustry/game/Rules.java
+index e9c918d..9ab5823 100644
+--- a/Mindustry-master/core/src/mindustry/game/Rules.java
++++ b/Mindustry-master/core/src/mindustry/game/Rules.java
+@@ -68,6 +68,8 @@ public class Rules{
+     public boolean randomWaveAI = false;
+     /** EXPERIMENTAL! If true, blocks will update in units and share power. */
+     public boolean unitPayloadUpdate = false;
++    /** EXPERIMENTAL! If true, units carried as payloads by other units will continue to update, shoot and use abilities. */
++    public boolean unitPayloadUnitUpdate = false;
+     /** If true, units' payloads are destroy()ed when the unit is destroyed. */
+     public boolean unitPayloadsExplode = false;
+     /** Whether cores add to unit limit */
+diff --git a/Mindustry-master/core/src/mindustry/type/Weapon.java b/Mindustry-master/core/src/mindustry/type/Weapon.java
+index eedcaa2..430f508 100644
+--- a/Mindustry-master/core/src/mindustry/type/Weapon.java
++++ b/Mindustry-master/core/src/mindustry/type/Weapon.java
+@@ -439,7 +439,7 @@ public class Weapon implements Cloneable{
+         mount.warmup >= minWarmup && //must be warmed up
+         velLen >= minShootVelocity && //check velocity requirements
+         (mount.reload <= 0.0001f || (alwaysContinuous && mount.bullet == null)) && //reload has to be 0, or it has to be an always-continuous weapon
+-        (alwaysShooting || Angles.within(rotate ? mount.rotation : unit.rotation + baseRotation, mount.targetRotation, shootCone)) //has to be within the cone
++        (alwaysShooting || unit.inPayload || Angles.within(rotate ? mount.rotation : unit.rotation + baseRotation, mount.targetRotation, shootCone)) //has to be within the cone; inPayload units can always shoot regardless of rotation
+         ){
+             shoot(unit, mount, bulletX, bulletY, shootAngle);
+ 
+@@ -461,7 +461,10 @@ public class Weapon implements Cloneable{
+     }
+ 
+     protected float bulletRotation(Unit unit, WeaponMount mount, float bulletX, float bulletY){
+-        return rotate ? unit.rotation + mount.rotation : Angles.angle(bulletX, bulletY, mount.aimX, mount.aimY) + (unit.rotation - unit.angleTo(mount.aimX, mount.aimY)) + baseRotation;
++        if(rotate) return unit.rotation + mount.rotation;
++        // For inPayload units, shoot directly toward the aim point without unit rotation correction
++        if(unit.inPayload) return Angles.angle(bulletX, bulletY, mount.aimX, mount.aimY) + baseRotation;
++        return Angles.angle(bulletX, bulletY, mount.aimX, mount.aimY) + (unit.rotation - unit.angleTo(mount.aimX, mount.aimY)) + baseRotation;
+     }
+ 
+     protected void shoot(Unit unit, WeaponMount mount, float shootX, float shootY, float rotation){
+diff --git a/Mindustry-master/core/src/mindustry/ui/dialogs/CustomRulesDialog.java b/Mindustry-master/core/src/mindustry/ui/dialogs/CustomRulesDialog.java
+index 98c85e5..7bb1054 100644
+--- a/Mindustry-master/core/src/mindustry/ui/dialogs/CustomRulesDialog.java
++++ b/Mindustry-master/core/src/mindustry/ui/dialogs/CustomRulesDialog.java
+@@ -193,6 +193,8 @@ public class CustomRulesDialog extends BaseDialog{
+         category("unit");
+         check("@rules.unitcapvariable", b -> rules.unitCapVariable = b, () -> rules.unitCapVariable);
+         check("@rules.unitpayloadsexplode", b -> rules.unitPayloadsExplode = b, () -> rules.unitPayloadsExplode);
++        check("@rules.unitpayloadupdate", b -> rules.unitPayloadUpdate = b, () -> rules.unitPayloadUpdate);
++        check("@rules.unitpayloadunitupdate", b -> rules.unitPayloadUnitUpdate = b, () -> rules.unitPayloadUnitUpdate);
+         numberi("@rules.unitcap", f -> rules.unitCap = f, () -> rules.unitCap, -999, 999);
+         number("@rules.unitdamagemultiplier", f -> rules.unitDamageMultiplier = f, () -> rules.unitDamageMultiplier);
+         number("@rules.unitcrashdamagemultiplier", f -> rules.unitCrashDamageMultiplier = f, () -> rules.unitCrashDamageMultiplier);
+diff --git a/Mindustry-master/core/src/mindustry/world/blocks/payloads/UnitPayload.java b/Mindustry-master/core/src/mindustry/world/blocks/payloads/UnitPayload.java
+index 8a351ef..27cb615 100644
+--- a/Mindustry-master/core/src/mindustry/world/blocks/payloads/UnitPayload.java
++++ b/Mindustry-master/core/src/mindustry/world/blocks/payloads/UnitPayload.java
+@@ -4,6 +4,7 @@ import arc.*;
+ import arc.graphics.*;
+ import arc.graphics.g2d.*;
+ import arc.math.*;
++import arc.math.geom.*;
+ import arc.scene.style.*;
+ import arc.util.*;
+ import arc.util.io.*;
+@@ -50,6 +51,17 @@ public class UnitPayload implements Payload{
+     @Override
+     public void update(@Nullable Unit unitHolder, @Nullable Building buildingHolder){
+         unit.type.updatePayload(unit, unitHolder, buildingHolder);
++
++        // When the unit is kept in the group (unitPayloadUnitUpdate rule), force its position to match the carrier
++        if(unitHolder != null && Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
++            unit.set(unitHolder.x, unitHolder.y);
++            // Inherit carrier's velocity so bullets are fired with correct velocity
++            unit.vel.set(unitHolder.vel);
++            // Ensure physics mass stays at 0 (physref may be initialized after add())
++            if(unit.physref != null && unit.physref.body.mass != 0f){
++                unit.physref.body.mass = 0f;
++            }
++        }
+     }
+ 
+     @Override
+@@ -74,6 +86,19 @@ public class UnitPayload implements Payload{
+         unit.write(write);
+     }
+ 
++    @Override
++    public void remove(){
++        // When the carrier is removed and unitPayloadUnitUpdate is enabled, restore the carried unit's state
++        if(Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
++            if(unit.physref != null){
++                unit.physref.body.mass = unit.mass();
++            }
++            unit.elevation = 0f;
++            unit.inPayload = false;
++            // Unit is already in the group, nothing else needed
++        }
++    }
++
+     @Override
+     public void set(float x, float y, float rotation){
+         unit.set(x, y);
+@@ -123,7 +148,9 @@ public class UnitPayload implements Payload{
+         }
+ 
+         //cannot dump when there's a lot of overlap going on
+-        if(!unit.type.flying && Units.count(unit.x, unit.y, unit.physicSize() * 1.05f, o -> o.isGrounded() && (o.type.allowLegStep == unit.type.allowLegStep)) > 0){
++        // When unitPayloadUnitUpdate is enabled, exclude the unit itself from the count (it's already in the group)
++        int maxOverlap = (Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload) ? 1 : 0;
++        if(!unit.type.flying && Units.count(unit.x, unit.y, unit.physicSize() * 1.05f, o -> o.isGrounded() && (o.type.allowLegStep == unit.type.allowLegStep)) > maxOverlap){
+             return false;
+         }
+ 
+@@ -132,7 +159,17 @@ public class UnitPayload implements Payload{
+ 
+         //prevents stacking
+         unit.vel.add(Mathf.range(0.5f), Mathf.range(0.5f));
+-        unit.add();
++
++        if(Vars.state.rules.unitPayloadUnitUpdate && unit.inPayload){
++            // Unit is already in the group, just restore its state
++            if(unit.physref != null){
++                unit.physref.body.mass = unit.mass();
++            }
++            unit.elevation = 0f;
++            unit.inPayload = false;
++        } else {
++            unit.add();
++        }
+         unit.unloaded();
+         Events.fire(new UnitUnloadEvent(unit));
+         Units.notifyUnitSpawn(unit);
