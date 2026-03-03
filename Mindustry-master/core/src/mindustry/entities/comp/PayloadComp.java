@@ -25,6 +25,7 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
     @Import float x, y, rotation;
     @Import Team team;
     @Import UnitType type;
+    @Import ItemStack stack;
 
     Seq<Payload> payloads = new Seq<>();
 
@@ -58,6 +59,21 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
             //}
             pay.set(x, y, rotation);
             pay.update(self(), null);
+        }
+
+        // When unitPayloadUpdate is enabled, supply carried blocks with items from the carrier's inventory
+        if(Vars.state.rules.unitPayloadUpdate && stack.amount > 0 && stack.item != null){
+            Item item = stack.item;
+            for(Payload pay : payloads){
+                if(pay instanceof BuildPayload bp && bp.build.block.hasItems && bp.build.acceptItem(bp.build, item)){
+                    bp.build.handleItem(bp.build, item);
+                    stack.amount--;
+                    if(stack.amount <= 0){
+                        stack.amount = 0;
+                        break;
+                    }
+                }
+            }
         }
     }
 
