@@ -184,6 +184,17 @@ abstract class PayloadComp implements Posc, Rotc, Hitboxc, Unitc{
         //drop off payload on an acceptor if possible
         if(on != null && on.build != null && on.build.team == team && on.build.acceptPayload(on.build, payload)){
             Fx.unitDrop.at(on.build);
+            // When unitPayloadUnitUpdate is enabled and a UnitPayload is transferred from a unit carrier to a block,
+            // the unit must be removed from the unit group (it's no longer a live unit, it's a block payload now).
+            if(Vars.state.rules.unitPayloadUnitUpdate && payload instanceof UnitPayload up && up.unit.inPayload){
+                up.unit.inPayload = false;
+                // Restore the unit's natural elevation: flying units hover at 1f, ground/naval units rest at 0f.
+                up.unit.elevation = up.unit.type.flying ? 1f : 0f;
+                if(up.unit.physref != null){
+                    up.unit.physref.body.mass = up.unit.mass();
+                }
+                up.unit.remove();
+            }
             on.build.handlePayload(on.build, payload);
             return true;
         }
