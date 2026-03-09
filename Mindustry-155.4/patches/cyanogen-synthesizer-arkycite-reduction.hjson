@@ -1,0 +1,12 @@
+// Patch: Cyanogen Synthesizer Arkycite Reduction
+// Changes the arkycite consumption from 160 to 120 per minute
+
+name: Cyanogen Synthesizer Arkycite Reduction
+
+block: {
+  cyanogen-synthesizer: {
+    // Change arkycite consumption from 160/60 to 120/60 (per second)
+    // The consumeLiquid consumer for arkycite is at index 0 in the consumes array
+    consumes.liquid.0.amount: 2.0
+  }
+}
